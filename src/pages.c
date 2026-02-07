@@ -32,8 +32,19 @@
 /******************************************************************************/
 /* Data. */
 
-/* Actual operating system page size, detected during bootstrap, <= PAGE. */
+/*
+ * Actual operating system page size, detected during bootstrap.  Normally
+ * os_page <= PAGE, but subpage mode permits os_page > PAGE.
+ */
 size_t	os_page;
+
+static bool pages_subpage;
+
+static inline bool
+pages_os_page_aligned(void *addr, size_t size) {
+	return ALIGNMENT_ADDR2BASE(addr, os_page) == addr &&
+	    ALIGNMENT_CEILING(size, os_page) == size;
+}
 
 #ifndef _WIN32
 #  define PAGES_PROT_COMMIT (PROT_READ | PROT_WRITE)
@@ -68,7 +79,7 @@ static int madvise_dont_need_zeros_is_faulty = -1;
  */
 static int madvise_MADV_DONTNEED_zeroes_pages(void)
 {
-	size_t size = PAGE;
+	size_t size = pages_subpage ? os_page : PAGE;
 
 	void * addr = mmap(NULL, size, PROT_READ|PROT_WRITE,
 	    MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
@@ -276,6 +287,13 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 
 void *
 pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
+	if (pages_subpage && addr != NULL &&
+	    ALIGNMENT_ADDR2BASE(addr, os_page) != addr) {
+		return NULL;
+	}
+	if (pages_subpage && ALIGNMENT_CEILING(size, os_page) != size) {
+		return NULL;
+	}
 	assert(alignment >= PAGE);
 	assert(ALIGNMENT_ADDR2BASE(addr, alignment) == addr);
 
@@ -340,6 +358,9 @@ void
 pages_unmap(void *addr, size_t size) {
 	assert(PAGE_ADDR2BASE(addr) == addr);
 	assert(PAGE_CEILING(size) == size);
+	if (pages_subpage && !pages_os_page_aligned(addr, size)) {
+		return;
+	}
 
 	os_pages_unmap(addr, size);
 }
@@ -378,6 +399,14 @@ pages_commit_impl(void *addr, size_t size, bool commit) {
 	if (os_overcommits) {
 		return true;
 	}
+	if (pages_subpage && !pages_os_page_aligned(addr, size)) {
+		/*
+		 * The OS cannot (de)commit partial system pages.  Treat
+		 * commit as a success (memory is already mapped), and
+		 * decommit as a failure to avoid marking it zeroed.
+		 */
+		return commit ? false : true;
+	}
 
 	return os_pages_commit(addr, size, commit);
 }
@@ -397,20 +426,27 @@ pages_mark_guards(void *head, void *tail) {
 	assert(head != NULL || tail != NULL);
 	assert(head == NULL || tail == NULL ||
 	    (uintptr_t)head < (uintptr_t)tail);
+	size_t guard_size = pages_subpage ? os_page : PAGE;
+	if (pages_subpage) {
+		if ((head != NULL && ALIGNMENT_ADDR2BASE(head, os_page) != head)
+		    || (tail != NULL && ALIGNMENT_ADDR2BASE(tail, os_page) != tail)) {
+			return;
+		}
+	}
 #ifdef JEMALLOC_HAVE_MPROTECT
 	if (head != NULL) {
-		mprotect(head, PAGE, PROT_NONE);
+		mprotect(head, guard_size, PROT_NONE);
 	}
 	if (tail != NULL) {
-		mprotect(tail, PAGE, PROT_NONE);
+		mprotect(tail, guard_size, PROT_NONE);
 	}
 #else
 	/* Decommit sets to PROT_NONE / MEM_DECOMMIT. */
 	if (head != NULL) {
-		os_pages_commit(head, PAGE, false);
+		os_pages_commit(head, guard_size, false);
 	}
 	if (tail != NULL) {
-		os_pages_commit(tail, PAGE, false);
+		os_pages_commit(tail, guard_size, false);
 	}
 #endif
 }
@@ -420,10 +456,17 @@ pages_unmark_guards(void *head, void *tail) {
 	assert(head != NULL || tail != NULL);
 	assert(head == NULL || tail == NULL ||
 	    (uintptr_t)head < (uintptr_t)tail);
+	size_t guard_size = pages_subpage ? os_page : PAGE;
+	if (pages_subpage) {
+		if ((head != NULL && ALIGNMENT_ADDR2BASE(head, os_page) != head)
+		    || (tail != NULL && ALIGNMENT_ADDR2BASE(tail, os_page) != tail)) {
+			return;
+		}
+	}
 #ifdef JEMALLOC_HAVE_MPROTECT
 	bool head_and_tail = (head != NULL) && (tail != NULL);
 	size_t range = head_and_tail ?
-	    (uintptr_t)tail - (uintptr_t)head + PAGE :
+	    (uintptr_t)tail - (uintptr_t)head + guard_size :
 	    SIZE_T_MAX;
 	/*
 	 * The amount of work that the kernel does in mprotect depends on the
@@ -436,26 +479,31 @@ pages_unmark_guards(void *head, void *tail) {
 		mprotect(head, range, PROT_READ | PROT_WRITE);
 	} else {
 		if (head != NULL) {
-			mprotect(head, PAGE, PROT_READ | PROT_WRITE);
+			mprotect(head, guard_size, PROT_READ | PROT_WRITE);
 		}
 		if (tail != NULL) {
-			mprotect(tail, PAGE, PROT_READ | PROT_WRITE);
+			mprotect(tail, guard_size, PROT_READ | PROT_WRITE);
 		}
 	}
 #else
 	if (head != NULL) {
-		os_pages_commit(head, PAGE, true);
+		os_pages_commit(head, guard_size, true);
 	}
 	if (tail != NULL) {
-		os_pages_commit(tail, PAGE, true);
+		os_pages_commit(tail, guard_size, true);
 	}
 #endif
 }
 
 bool
 pages_purge_lazy(void *addr, size_t size) {
-	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(PAGE_CEILING(size) == size);
+	if (!pages_subpage) {
+		assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
+	}
+	if (pages_subpage && !pages_os_page_aligned(addr, size)) {
+		return true;
+	}
 
 	if (!pages_can_purge_lazy) {
 		return true;
@@ -492,8 +540,13 @@ pages_purge_lazy(void *addr, size_t size) {
 
 bool
 pages_purge_forced(void *addr, size_t size) {
-	assert(PAGE_ADDR2BASE(addr) == addr);
 	assert(PAGE_CEILING(size) == size);
+	if (!pages_subpage) {
+		assert(PAGE_ADDR2BASE(addr) == addr);
+	}
+	if (pages_subpage && !pages_os_page_aligned(addr, size)) {
+		return true;
+	}
 
 	if (!pages_can_purge_forced) {
 		return true;
@@ -615,6 +668,11 @@ pages_dodump(void *addr, size_t size) {
 #else
 	return false;
 #endif
+}
+
+bool
+pages_subpage_enabled(void) {
+	return pages_subpage;
 }
 
 #ifdef JEMALLOC_HAVE_PROCESS_MADVISE
@@ -829,12 +887,18 @@ label_error:
 bool
 pages_boot(void) {
 	os_page = os_page_detect();
+	pages_subpage = false;
 	if (os_page > PAGE) {
-		malloc_write("<jemalloc>: Unsupported system page size\n");
-		if (opt_abort) {
-			abort();
+		if (!opt_subpage || (os_page % PAGE != 0)) {
+			malloc_write("<jemalloc>: Unsupported system page size\n");
+			if (opt_abort) {
+				abort();
+			}
+			return true;
 		}
-		return true;
+		pages_subpage = true;
+		malloc_printf("<jemalloc>: subpage mode enabled (os_page=%zu, page=%zu)\n",
+		    os_page, PAGE);
 	}
 
 #ifdef JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS
@@ -880,15 +944,17 @@ pages_boot(void) {
 	/* Detect lazy purge runtime support. */
 	if (pages_can_purge_lazy) {
 		bool committed = false;
-		void *madv_free_page = os_pages_map(NULL, PAGE, PAGE, &committed);
+		size_t test_page = pages_subpage ? os_page : PAGE;
+		void *madv_free_page = os_pages_map(NULL, test_page, test_page,
+		    &committed);
 		if (madv_free_page == NULL) {
 			return true;
 		}
 		assert(pages_can_purge_lazy_runtime);
-		if (pages_purge_lazy(madv_free_page, PAGE)) {
+		if (pages_purge_lazy(madv_free_page, test_page)) {
 			pages_can_purge_lazy_runtime = false;
 		}
-		os_pages_unmap(madv_free_page, PAGE);
+		os_pages_unmap(madv_free_page, test_page);
 	}
 #endif
 	if (init_process_madvise()) {

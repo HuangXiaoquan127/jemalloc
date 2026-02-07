@@ -1029,6 +1029,25 @@ mallctl("arena." STRINGIFY(MALLCTL_ARENAS_ALL) ".decay",
         and enabled elsewhere.</para></listitem>
       </varlistentry>
 
+      <varlistentry id="opt.subpage">
+        <term>
+          <mallctl>opt.subpage</mallctl>
+          (<type>bool</type>)
+          <literal>r-</literal>
+        </term>
+        <listitem><para>Enable subpage mode to allow the allocator page size
+        (<constant>PAGE</constant>) to be smaller than the operating system page
+        size.  This is intended for large-page systems (e.g. 64 KiB) built with
+        <option>--with-lg-page=12</option>, and requires the system page size to
+        be a multiple of <constant>PAGE</constant>.  When enabled, jemalloc maps
+        memory in system-page-sized chunks and splits them into
+        <constant>PAGE</constant>-sized extents for allocation.  This reduces
+        internal fragmentation, but OS purging and unmapping are still performed
+        only at system page granularity.  If the system page size is not larger
+        than <constant>PAGE</constant>, this option has no effect.  This option
+        is disabled by default.</para></listitem>
+      </varlistentry>
+
       <varlistentry id="opt.retain">
         <term>
           <mallctl>opt.retain</mallctl>

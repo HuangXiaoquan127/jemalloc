@@ -78,11 +78,19 @@ help reduce memory usage and fragmentation, at the cost of some CPU time:
   - Ensure the allocator page size matches the OS (especially for cross
     compiling). For 64 KiB pages, use `--with-lg-page=16`.
 
+  - If you need 4 KiB allocation granularity on 64 KiB systems, build with
+    `--with-lg-page=12` and enable the `subpage` runtime option (see below).
+    This maps memory in 64 KiB chunks but splits it into 4 KiB extents for
+    allocation; OS reclaim still happens at 64 KiB granularity.
+
   - Consider `--disable-cache-oblivious` to avoid the extra page per large
     allocation. On 64 KiB systems this can save significant memory, but it may
     reduce cache locality for large allocations.
 
 * Runtime options (malloc_conf):
+
+  - Enable subpage mode when built with `--with-lg-page=12`:
+    `subpage:true`.
 
   - Shorter decay times return 64 KiB pages faster:
     `dirty_decay_ms:1000,muzzy_decay_ms:0` (or `0,0` for aggressive purging).
