@@ -108,6 +108,10 @@ help reduce memory usage and fragmentation, at the cost of some CPU time:
     an active extent can be than a request. This can reduce fragmentation but
     may increase the number of active extents and metadata overhead.
 
+  - Split freed large extents to a maximum size to improve reuse and reduce
+    fragmentation: `lg_extent_max_split:20` (1 MiB) or a value that matches
+    your large allocation patterns.
+
   - Keep `metadata_thp:disabled` if minimizing memory usage is more important
     than TLB performance.
 

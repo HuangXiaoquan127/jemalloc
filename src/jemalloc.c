@@ -1500,6 +1500,10 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 			    "lg_extent_max_active_fit", 0,
 			    (sizeof(size_t) << 3), CONF_DONT_CHECK_MIN,
 			    CONF_CHECK_MAX, false)
+			CONF_HANDLE_SIZE_T(opt_lg_extent_max_split,
+			    "lg_extent_max_split", 0,
+			    (sizeof(size_t) << 3), CONF_DONT_CHECK_MIN,
+			    CONF_CHECK_MAX, false)
 
 			if (strncmp("percpu_arena", k, klen) == 0) {
 				bool match = false;

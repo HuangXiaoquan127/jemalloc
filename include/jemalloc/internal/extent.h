@@ -20,6 +20,8 @@
  */
 #define LG_EXTENT_MAX_ACTIVE_FIT_DEFAULT 6
 extern size_t opt_lg_extent_max_active_fit;
+/* Split large extents on record to this log2 size; 0 disables. */
+extern size_t opt_lg_extent_max_split;
 
 #define PROCESS_MADVISE_MAX_BATCH_DEFAULT 0
 extern size_t opt_process_madvise_max_batch;

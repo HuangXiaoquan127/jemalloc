@@ -1237,6 +1237,21 @@ mallctl("arena." STRINGIFY(MALLCTL_ARENAS_ALL) ".decay",
         is 6, which gives a maximum ratio of 64 (2^6).</para></listitem>
       </varlistentry>
 
+      <varlistentry id="opt.lg_extent_max_split">
+        <term>
+          <mallctl>opt.lg_extent_max_split</mallctl>
+          (<type>size_t</type>)
+          <literal>r-</literal>
+        </term>
+        <listitem><para>When recording freed large extents into the dirty
+        cache, split them so that each piece is at most
+        <literal>2^lg_extent_max_split</literal> bytes.  This improves reuse of
+        large extents and reduces fragmentation at the cost of additional
+        metadata and potentially higher split/merge overhead.  A value of 0
+        disables splitting.  The default is 0.  This option only affects dirty
+        extents.</para></listitem>
+      </varlistentry>
+
       <varlistentry id="opt.stats_print">
         <term>
           <mallctl>opt.stats_print</mallctl>

@@ -150,6 +150,7 @@ CTL_PROTO(opt_lg_tcache_flush_small_div)
 CTL_PROTO(opt_lg_tcache_flush_large_div)
 CTL_PROTO(opt_thp)
 CTL_PROTO(opt_lg_extent_max_active_fit)
+CTL_PROTO(opt_lg_extent_max_split)
 CTL_PROTO(opt_prof)
 CTL_PROTO(opt_prof_prefix)
 CTL_PROTO(opt_prof_active)
@@ -541,6 +542,7 @@ static const ctl_named_node_t opt_node[] = {
 		CTL(opt_lg_tcache_flush_large_div)},
 	{NAME("thp"),		CTL(opt_thp)},
 	{NAME("lg_extent_max_active_fit"), CTL(opt_lg_extent_max_active_fit)},
+	{NAME("lg_extent_max_split"), CTL(opt_lg_extent_max_split)},
 	{NAME("prof"),		CTL(opt_prof)},
 	{NAME("prof_prefix"),	CTL(opt_prof_prefix)},
 	{NAME("prof_active"),	CTL(opt_prof_active)},
@@ -2324,6 +2326,7 @@ CTL_RO_NL_GEN(opt_lg_tcache_flush_large_div, opt_lg_tcache_flush_large_div,
 CTL_RO_NL_GEN(opt_thp, thp_mode_names[opt_thp], const char *)
 CTL_RO_NL_GEN(opt_lg_extent_max_active_fit, opt_lg_extent_max_active_fit,
     size_t)
+CTL_RO_NL_GEN(opt_lg_extent_max_split, opt_lg_extent_max_split, size_t)
 CTL_RO_NL_GEN(opt_process_madvise_max_batch, opt_process_madvise_max_batch,
     size_t)
 CTL_RO_NL_CGEN(config_prof, opt_prof, opt_prof, bool)

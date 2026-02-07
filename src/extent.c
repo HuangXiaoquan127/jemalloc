@@ -12,6 +12,7 @@
 /* Data. */
 
 size_t opt_lg_extent_max_active_fit = LG_EXTENT_MAX_ACTIVE_FIT_DEFAULT;
+size_t opt_lg_extent_max_split = 0;
 /* This option is intended for kernel tuning, not app tuning. */
 size_t opt_process_madvise_max_batch =
 #ifdef JEMALLOC_HAVE_PROCESS_MADVISE
@@ -995,6 +996,30 @@ extent_record(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks, ecache_t *ecache,
 	malloc_mutex_lock(tsdn, &ecache->mtx);
 
 	emap_assert_mapped(tsdn, pac->emap, edata);
+
+	if (ecache->state == extent_state_dirty && opt_lg_extent_max_split != 0
+	    && opt_lg_extent_max_split < (sizeof(size_t) << 3)
+	    && !edata_guarded_get(edata) && !edata_slab_get(edata)
+	    && edata_size_get(edata) >= SC_LARGE_MINCLASS
+	    && !ehooks_split_will_fail(ehooks)) {
+		size_t split_size = (size_t)1ULL << opt_lg_extent_max_split;
+		if (split_size >= PAGE && edata_size_get(edata) > split_size) {
+			while (edata_size_get(edata) > split_size) {
+				size_t size_a = edata_size_get(edata) - split_size;
+				edata_t *trail = extent_split_wrapper(tsdn, pac,
+				    ehooks, edata, size_a, split_size,
+				    /* holding_core_locks */ true);
+				if (trail == NULL) {
+					break;
+				}
+				extent_deactivate_locked(tsdn, pac, ecache,
+				    trail);
+			}
+			extent_deactivate_locked(tsdn, pac, ecache, edata);
+			malloc_mutex_unlock(tsdn, &ecache->mtx);
+			return;
+		}
+	}
 
 	if (edata_guarded_get(edata)) {
 		goto label_skip_coalesce;
