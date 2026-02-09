@@ -4,7 +4,10 @@
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_types.h"
 
-/* Actual operating system page size, detected during bootstrap, <= PAGE. */
+/*
+ * Actual operating system page size, detected during bootstrap.  Normally
+ * os_page <= PAGE, but in subpage mode os_page may be larger.
+ */
 extern size_t	os_page;
 
 /* Page size.  LG_PAGE is determined by the configure script. */
@@ -127,6 +130,7 @@ bool pages_nohuge(void *addr, size_t size);
 bool pages_collapse(void *addr, size_t size);
 bool pages_dontdump(void *addr, size_t size);
 bool pages_dodump(void *addr, size_t size);
+bool pages_subpage_enabled(void);
 bool pages_boot(void);
 void pages_set_thp_state (void *ptr, size_t size);
 void pages_mark_guards(void *head, void *tail);

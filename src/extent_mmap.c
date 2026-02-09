@@ -35,6 +35,11 @@ extent_alloc_mmap(void *new_addr, size_t size, size_t alignment, bool *zero,
 bool
 extent_dalloc_mmap(void *addr, size_t size) {
 	if (!opt_retain) {
+		if (pages_subpage_enabled() &&
+		    (ALIGNMENT_ADDR2BASE(addr, os_page) != addr ||
+		    ALIGNMENT_CEILING(size, os_page) != size)) {
+			return true;
+		}
 		pages_unmap(addr, size);
 	}
 	return opt_retain;

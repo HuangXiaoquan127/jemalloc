@@ -66,6 +66,58 @@ Runtime options can be set via
     Suggested: try `percpu_arena:percpu` or `percpu_arena:phycpu` if
     thread migration between processors is expected to be infrequent.
 
+## Large OS page sizes (e.g. 64 KiB)
+
+When the system page size is large, each arena manages memory in larger
+page-sized chunks. This can increase internal fragmentation and amplify any
+per-allocation overhead that is "one page" in size. The following settings can
+help reduce memory usage and fragmentation, at the cost of some CPU time:
+
+* Build-time options (see INSTALL.md):
+
+  - Ensure the allocator page size matches the OS (especially for cross
+    compiling). For 64 KiB pages, use `--with-lg-page=16`.
+
+  - If you need 4 KiB allocation granularity on 64 KiB systems, build with
+    `--with-lg-page=12` and enable the `subpage` runtime option (see below).
+    This maps memory in 64 KiB chunks but splits it into 4 KiB extents for
+    allocation; OS reclaim still happens at 64 KiB granularity.
+
+  - Consider `--disable-cache-oblivious` to avoid the extra page per large
+    allocation. On 64 KiB systems this can save significant memory, but it may
+    reduce cache locality for large allocations.
+
+* Runtime options (malloc_conf):
+
+  - Enable subpage mode when built with `--with-lg-page=12`:
+    `subpage:true`.
+
+  - Shorter decay times return 64 KiB pages faster:
+    `dirty_decay_ms:1000,muzzy_decay_ms:0` (or `0,0` for aggressive purging).
+
+  - Enable `background_thread:true` to keep purge work off application threads
+    when using short decay times.
+
+  - Lower arena counts reduce fragmentation from independent page-aligned
+    extents: `narenas:1` or a small multiple of CPU count.
+
+  - Reduce or disable tcache to limit cached memory:
+    `tcache_max:1024` or `tcache:false` for very low memory usage.
+
+  - Lower `lg_extent_max_active_fit` (e.g. `1` or `2`) to limit how much larger
+    an active extent can be than a request. This can reduce fragmentation but
+    may increase the number of active extents and metadata overhead.
+
+  - Split freed large extents to a maximum size to improve reuse and reduce
+    fragmentation: `lg_extent_max_split:20` (1 MiB) or a value that matches
+    your large allocation patterns.
+
+  - Keep `metadata_thp:disabled` if minimizing memory usage is more important
+    than TLB performance.
+
+  - Example memory-first configuration for 64 KiB pages:
+    `background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0,narenas:1,tcache_max:1024,lg_extent_max_active_fit:2,metadata_thp:disabled`
+
 Examples:
 
 * High resource consumption application, prioritizing CPU utilization:

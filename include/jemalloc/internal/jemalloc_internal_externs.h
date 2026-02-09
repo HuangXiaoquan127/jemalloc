@@ -40,6 +40,7 @@ extern bool opt_cache_oblivious;
 extern unsigned opt_debug_double_free_max_scan;
 extern size_t opt_calloc_madvise_threshold;
 extern bool opt_disable_large_size_classes;
+extern bool opt_subpage;
 
 extern const char *opt_malloc_conf_symlink;
 extern const char *opt_malloc_conf_env_var;

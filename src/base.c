@@ -339,9 +339,13 @@ base_extent_bump_alloc(tsdn_t *tsdn, base_t *base, edata_t *edata, size_t size,
 
 static size_t
 base_block_size_ceil(size_t block_size) {
-	return opt_metadata_thp == metadata_thp_disabled ?
+	size_t size = opt_metadata_thp == metadata_thp_disabled ?
 	    ALIGNMENT_CEILING(block_size, BASE_BLOCK_MIN_ALIGN) :
 	    HUGEPAGE_CEILING(block_size);
+	if (pages_subpage_enabled()) {
+		size = ALIGNMENT_CEILING(size, os_page);
+	}
+	return size;
 }
 
 /*

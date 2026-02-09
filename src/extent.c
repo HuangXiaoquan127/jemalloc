@@ -12,6 +12,7 @@
 /* Data. */
 
 size_t opt_lg_extent_max_active_fit = LG_EXTENT_MAX_ACTIVE_FIT_DEFAULT;
+size_t opt_lg_extent_max_split = 0;
 /* This option is intended for kernel tuning, not app tuning. */
 size_t opt_process_madvise_max_batch =
 #ifdef JEMALLOC_HAVE_PROCESS_MADVISE
@@ -996,6 +997,30 @@ extent_record(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks, ecache_t *ecache,
 
 	emap_assert_mapped(tsdn, pac->emap, edata);
 
+	if (ecache->state == extent_state_dirty && opt_lg_extent_max_split != 0
+	    && opt_lg_extent_max_split < (sizeof(size_t) << 3)
+	    && !edata_guarded_get(edata) && !edata_slab_get(edata)
+	    && edata_size_get(edata) >= SC_LARGE_MINCLASS
+	    && !ehooks_split_will_fail(ehooks)) {
+		size_t split_size = (size_t)1ULL << opt_lg_extent_max_split;
+		if (split_size >= PAGE && edata_size_get(edata) > split_size) {
+			while (edata_size_get(edata) > split_size) {
+				size_t size_a = edata_size_get(edata) - split_size;
+				edata_t *trail = extent_split_wrapper(tsdn, pac,
+				    ehooks, edata, size_a, split_size,
+				    /* holding_core_locks */ true);
+				if (trail == NULL) {
+					break;
+				}
+				extent_deactivate_locked(tsdn, pac, ecache,
+				    trail);
+			}
+			extent_deactivate_locked(tsdn, pac, ecache, edata);
+			malloc_mutex_unlock(tsdn, &ecache->mtx);
+			return;
+		}
+	}
+
 	if (edata_guarded_get(edata)) {
 		goto label_skip_coalesce;
 	}
@@ -1100,14 +1125,24 @@ extent_alloc_wrapper(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks,
 		return NULL;
 	}
 	size_t palignment = ALIGNMENT_CEILING(alignment, PAGE);
-	void *addr = ehooks_alloc(tsdn, ehooks, new_addr, size, palignment,
+	size_t alloc_size = size;
+	bool split_extra = false;
+	if (pages_subpage_enabled() && ehooks_are_default(ehooks)
+	    && new_addr == NULL && alignment <= os_page
+	    && !ehooks_split_will_fail(ehooks)
+	    && size != ALIGNMENT_CEILING(size, os_page)) {
+		alloc_size = ALIGNMENT_CEILING(size, os_page);
+		palignment = os_page;
+		split_extra = true;
+	}
+	void *addr = ehooks_alloc(tsdn, ehooks, new_addr, alloc_size, palignment,
 	    &zero, commit);
 	if (addr == NULL) {
 		edata_cache_put(tsdn, pac->edata_cache, edata);
 		return NULL;
 	}
 	edata_init(edata, ecache_ind_get(&pac->ecache_dirty), addr,
-	    size, /* slab */ false, SC_NSIZES, extent_sn_next(pac),
+	    alloc_size, /* slab */ false, SC_NSIZES, extent_sn_next(pac),
 	    extent_state_active, zero, *commit, EXTENT_PAI_PAC,
 	    opt_retain ? EXTENT_IS_HEAD : EXTENT_NOT_HEAD);
 	/*
@@ -1119,6 +1154,17 @@ extent_alloc_wrapper(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks,
 	if (extent_register_impl(tsdn, pac, edata, gdump_add)) {
 		edata_cache_put(tsdn, pac->edata_cache, edata);
 		return NULL;
+	}
+
+	if (split_extra) {
+		size_t trail_size = alloc_size - size;
+		edata_t *trail = extent_split_wrapper(tsdn, pac, ehooks, edata,
+		    size, trail_size, /* holding_core_locks */ false);
+		if (trail == NULL) {
+			extent_dalloc_wrapper(tsdn, pac, ehooks, edata);
+			return NULL;
+		}
+		extent_record(tsdn, pac, ehooks, &pac->ecache_dirty, trail);
 	}
 
 	return edata;

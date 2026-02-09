@@ -98,6 +98,7 @@ CTL_PROTO(opt_abort_conf)
 CTL_PROTO(opt_cache_oblivious)
 CTL_PROTO(opt_debug_double_free_max_scan)
 CTL_PROTO(opt_trust_madvise)
+CTL_PROTO(opt_subpage)
 CTL_PROTO(opt_confirm_conf)
 CTL_PROTO(opt_hpa)
 CTL_PROTO(opt_hpa_slab_max_alloc)
@@ -149,6 +150,7 @@ CTL_PROTO(opt_lg_tcache_flush_small_div)
 CTL_PROTO(opt_lg_tcache_flush_large_div)
 CTL_PROTO(opt_thp)
 CTL_PROTO(opt_lg_extent_max_active_fit)
+CTL_PROTO(opt_lg_extent_max_split)
 CTL_PROTO(opt_prof)
 CTL_PROTO(opt_prof_prefix)
 CTL_PROTO(opt_prof_active)
@@ -478,6 +480,7 @@ static const ctl_named_node_t opt_node[] = {
 	{NAME("abort_conf"),	CTL(opt_abort_conf)},
 	{NAME("cache_oblivious"),	CTL(opt_cache_oblivious)},
 	{NAME("trust_madvise"),	CTL(opt_trust_madvise)},
+	{NAME("subpage"),	CTL(opt_subpage)},
 	{NAME("confirm_conf"),	CTL(opt_confirm_conf)},
 	{NAME("hpa"),		CTL(opt_hpa)},
 	{NAME("hpa_slab_max_alloc"),	CTL(opt_hpa_slab_max_alloc)},
@@ -539,6 +542,7 @@ static const ctl_named_node_t opt_node[] = {
 		CTL(opt_lg_tcache_flush_large_div)},
 	{NAME("thp"),		CTL(opt_thp)},
 	{NAME("lg_extent_max_active_fit"), CTL(opt_lg_extent_max_active_fit)},
+	{NAME("lg_extent_max_split"), CTL(opt_lg_extent_max_split)},
 	{NAME("prof"),		CTL(opt_prof)},
 	{NAME("prof_prefix"),	CTL(opt_prof_prefix)},
 	{NAME("prof_active"),	CTL(opt_prof_active)},
@@ -2245,6 +2249,7 @@ CTL_RO_NL_GEN(opt_cache_oblivious, opt_cache_oblivious, bool)
 CTL_RO_NL_GEN(opt_debug_double_free_max_scan,
     opt_debug_double_free_max_scan, unsigned)
 CTL_RO_NL_GEN(opt_trust_madvise, opt_trust_madvise, bool)
+CTL_RO_NL_GEN(opt_subpage, opt_subpage, bool)
 CTL_RO_NL_GEN(opt_confirm_conf, opt_confirm_conf, bool)
 
 /* HPA options. */
@@ -2321,6 +2326,7 @@ CTL_RO_NL_GEN(opt_lg_tcache_flush_large_div, opt_lg_tcache_flush_large_div,
 CTL_RO_NL_GEN(opt_thp, thp_mode_names[opt_thp], const char *)
 CTL_RO_NL_GEN(opt_lg_extent_max_active_fit, opt_lg_extent_max_active_fit,
     size_t)
+CTL_RO_NL_GEN(opt_lg_extent_max_split, opt_lg_extent_max_split, size_t)
 CTL_RO_NL_GEN(opt_process_madvise_max_batch, opt_process_madvise_max_batch,
     size_t)
 CTL_RO_NL_CGEN(config_prof, opt_prof, opt_prof, bool)

@@ -1029,6 +1029,25 @@ mallctl("arena." STRINGIFY(MALLCTL_ARENAS_ALL) ".decay",
         and enabled elsewhere.</para></listitem>
       </varlistentry>
 
+      <varlistentry id="opt.subpage">
+        <term>
+          <mallctl>opt.subpage</mallctl>
+          (<type>bool</type>)
+          <literal>r-</literal>
+        </term>
+        <listitem><para>Enable subpage mode to allow the allocator page size
+        (<constant>PAGE</constant>) to be smaller than the operating system page
+        size.  This is intended for large-page systems (e.g. 64 KiB) built with
+        <option>--with-lg-page=12</option>, and requires the system page size to
+        be a multiple of <constant>PAGE</constant>.  When enabled, jemalloc maps
+        memory in system-page-sized chunks and splits them into
+        <constant>PAGE</constant>-sized extents for allocation.  This reduces
+        internal fragmentation, but OS purging and unmapping are still performed
+        only at system page granularity.  If the system page size is not larger
+        than <constant>PAGE</constant>, this option has no effect.  This option
+        is disabled by default.</para></listitem>
+      </varlistentry>
+
       <varlistentry id="opt.retain">
         <term>
           <mallctl>opt.retain</mallctl>
@@ -1216,6 +1235,21 @@ mallctl("arena." STRINGIFY(MALLCTL_ARENAS_ALL) ".decay",
         (especially for non-active extents).  Lower value may reduce
         fragmentation, at the cost of extra active extents.  The default value
         is 6, which gives a maximum ratio of 64 (2^6).</para></listitem>
+      </varlistentry>
+
+      <varlistentry id="opt.lg_extent_max_split">
+        <term>
+          <mallctl>opt.lg_extent_max_split</mallctl>
+          (<type>size_t</type>)
+          <literal>r-</literal>
+        </term>
+        <listitem><para>When recording freed large extents into the dirty
+        cache, split them so that each piece is at most
+        <literal>2^lg_extent_max_split</literal> bytes.  This improves reuse of
+        large extents and reduces fragmentation at the cost of additional
+        metadata and potentially higher split/merge overhead.  A value of 0
+        disables splitting.  The default is 0.  This option only affects dirty
+        extents.</para></listitem>
       </varlistentry>
 
       <varlistentry id="opt.stats_print">

@@ -112,6 +112,7 @@ bool opt_cache_oblivious =
     false
 #endif
     ;
+bool opt_subpage = false;
 
 zero_realloc_action_t opt_zero_realloc_action =
 #ifdef JEMALLOC_ZERO_REALLOC_DEFAULT_FREE
@@ -1244,6 +1245,7 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 			CONF_HANDLE_BOOL(opt_abort_conf, "abort_conf")
 			CONF_HANDLE_BOOL(opt_cache_oblivious, "cache_oblivious")
 			CONF_HANDLE_BOOL(opt_trust_madvise, "trust_madvise")
+			CONF_HANDLE_BOOL(opt_subpage, "subpage")
 			CONF_HANDLE_BOOL(opt_huge_arena_pac_thp, "huge_arena_pac_thp")
 			if (strncmp("metadata_thp", k, klen) == 0) {
 				int m;
@@ -1496,6 +1498,10 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 			    CONF_DONT_CHECK_MIN, CONF_CHECK_MAX, false)
 			CONF_HANDLE_SIZE_T(opt_lg_extent_max_active_fit,
 			    "lg_extent_max_active_fit", 0,
+			    (sizeof(size_t) << 3), CONF_DONT_CHECK_MIN,
+			    CONF_CHECK_MAX, false)
+			CONF_HANDLE_SIZE_T(opt_lg_extent_max_split,
+			    "lg_extent_max_split", 0,
 			    (sizeof(size_t) << 3), CONF_DONT_CHECK_MIN,
 			    CONF_CHECK_MAX, false)
 
